@@ -18,6 +18,7 @@ export const ROUTES = {
   EDIT_PROFILE: "/profile/edit",
   SETTINGS: "/settings",
   ANALYTICS: "/analytics",
+  MIGRATE: "/admin/migrate", // Temporary migration page
 };
 
 export type RouteKey = keyof typeof ROUTES;

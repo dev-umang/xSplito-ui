@@ -28,7 +28,7 @@ export const fbRefs = {
   userGroups: (userId: string) =>
     query(
       collection(fbStore, fbNodes.groups),
-      where("members", "array-contains", userId)
+      where("memberIds", "array-contains", userId)
     ),
 
   // Expenses

@@ -1,4 +1,8 @@
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { doc, onSnapshot, query, where, orderBy, collection, Timestamp } from "firebase/firestore";
+import { fbStore } from "@/configs/firebase/firebase.config";
+import { fbNodes } from "@/configs/firebase/firebase.nodes";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,31 +30,121 @@ import {
   ROUTES,
   getAddExpenseRoute,
 } from "@/configs/navigation/navigation.constants";
-import { useListenGroupDetails } from "../hooks/useListenGroups";
-import { useSelectedGroup, useGroupsLoading } from "../store/groups.store";
 import { useAuthUser } from "@/modules/auth/store/auth.store";
-import { useListenGroupExpenses } from "@/modules/expenses/hooks/useListenExpenses";
-import { useGroupExpenses } from "@/modules/expenses/store/expenses.store";
 import { EXPENSE_CATEGORIES } from "@/modules/expenses/types/expenses.types";
-import { useCalculateBalances } from "@/modules/balances/hooks/useCalculateBalances";
-import { useGroupBalances } from "@/modules/balances/store/balances.store";
+import { calculateGroupBalances } from "@/modules/balances/utils/balance.utils";
 import { getUserDebts } from "@/modules/balances/utils/balance.utils";
+import type { Group } from "@/modules/groups/types/groups.types";
+import type { Expense } from "@/modules/expenses/types/expenses.types";
 
 export const GroupDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const authUser = useAuthUser();
 
-  useListenGroupDetails(id); // Start listening to group details
-  useListenGroupExpenses(id); // Start listening to expenses
+  const [group, setGroup] = useState<Group | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const group = useSelectedGroup();
-  const loading = useGroupsLoading();
-  const expenses = useGroupExpenses(id || "");
+  // Listen to group details
+  useEffect(() => {
+    if (!id) return;
 
-  // Calculate balances
-  useCalculateBalances(group);
-  const balances = useGroupBalances(id || "");
+    const groupRef = doc(fbStore, fbNodes.groups, id);
+    const unsubscribe = onSnapshot(groupRef, (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        const groupData: Group = {
+          id: doc.id,
+          name: data.name,
+          description: data.description || undefined,
+          imageUrl: data.imageUrl || undefined,
+          currency: data.currency,
+          members: (data.members || []).map((m: { 
+            userId: string; 
+            name: string; 
+            email: string; 
+            photoURL?: string | null; 
+            role: string; 
+            joinedAt?: Timestamp | Date 
+          }) => ({
+            userId: m.userId,
+            name: m.name,
+            email: m.email,
+            photoURL: m.photoURL,
+            role: m.role,
+            joinedAt: m.joinedAt instanceof Date 
+              ? m.joinedAt 
+              : (m.joinedAt as Timestamp)?.toDate?.() || new Date(),
+          })),
+          createdBy: data.createdBy,
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+          updatedAt: data.updatedAt?.toDate?.() || new Date(),
+        };
+        setGroup(groupData);
+      } else {
+        setGroup(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [id]);
+
+  // Listen to expenses
+  useEffect(() => {
+    if (!id) return;
+
+    const expensesQuery = query(
+      collection(fbStore, fbNodes.expenses),
+      where("groupId", "==", id),
+      orderBy("date", "desc")
+    );
+
+    const unsubscribe = onSnapshot(expensesQuery, (snapshot) => {
+      const expensesList: Expense[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          groupId: data.groupId,
+          groupName: data.groupName,
+          description: data.description,
+          amount: data.amount,
+          currency: data.currency,
+          category: data.category,
+          paidBy: data.paidBy,
+          splitType: data.splitType,
+          participants: data.participants,
+          date: data.date?.toDate?.() || new Date(),
+          notes: data.notes,
+          createdBy: data.createdBy,
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+          updatedAt: data.updatedAt?.toDate?.() || new Date(),
+        };
+      });
+      setExpenses(expensesList);
+    });
+
+    return () => unsubscribe();
+  }, [id]);
+
+  // Calculate balances when group or expenses change
+  const balances = useMemo(() => {
+    if (!group || expenses.length === 0) {
+      return null;
+    }
+
+    return calculateGroupBalances(
+      group.id,
+      expenses,
+      group.members.map((m) => ({
+        userId: m.userId,
+        name: m.name,
+        email: m.email,
+        photoURL: m.photoURL || undefined,
+      }))
+    );
+  }, [group, expenses]);
 
   const isAdmin =
     group?.members.find((m) => m.userId === authUser?.uid)?.role === "admin";

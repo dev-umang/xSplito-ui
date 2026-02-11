@@ -8,7 +8,12 @@ export const useListenGroupExpenses = (groupId: string | undefined) => {
   const { setGroupExpenses, setLoading } = useExpensesActions();
 
   useEffect(() => {
+    console.log(
+      `[useListenGroupExpenses] Setup listener for groupId: ${groupId}`,
+    );
+
     if (!groupId) {
+      console.log(`[useListenGroupExpenses] No groupId, skipping`);
       return;
     }
 
@@ -20,9 +25,13 @@ export const useListenGroupExpenses = (groupId: string | undefined) => {
     );
 
     const unsubscribe = onSnapshot(expensesQuery, (snapshot) => {
+      console.log(`[useListenGroupExpenses] Snapshot received for ${groupId}`, {
+        expenseCount: snapshot.docs.length,
+        hasPendingWrites: snapshot.metadata.hasPendingWrites,
+      });
+
       const expenses: Expense[] = snapshot.docs.map((doc) => {
         const data = doc.data();
-        console.log({ data });
         return {
           id: doc.id,
           groupId: data.groupId,
@@ -46,6 +55,9 @@ export const useListenGroupExpenses = (groupId: string | undefined) => {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log(`[useListenGroupExpenses] Cleanup listener for ${groupId}`);
+      unsubscribe();
+    };
   }, [groupId, setGroupExpenses, setLoading]);
 };

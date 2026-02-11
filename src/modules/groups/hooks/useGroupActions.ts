@@ -72,6 +72,7 @@ export const useCreateGroup = () => {
             ...m,
             joinedAt: now,
           })),
+          memberIds: members.map((m) => m.userId), // For efficient querying
           createdBy: authUser.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -189,6 +190,7 @@ export const useAddGroupMember = () => {
 
         await updateDoc(groupRef, {
           members: [...members, newMember],
+          memberIds: [...members.map(m => m.userId), userId],
           updatedAt: serverTimestamp(),
         });
 
@@ -225,6 +227,7 @@ export const useRemoveGroupMember = () => {
 
         await updateDoc(groupRef, {
           members,
+          memberIds: members.map(m => m.userId),
           updatedAt: serverTimestamp(),
         });
 

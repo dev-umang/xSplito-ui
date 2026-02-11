@@ -18,9 +18,19 @@ export const useBalancesStore = create<BalancesStoreType>((set, get) => ({
     setGroupBalances: (groupId, balances) => {
       const current = get().groupBalances[groupId];
       // Only update if balances actually changed
-      if (JSON.stringify(current) === JSON.stringify(balances)) {
+      const currentStr = JSON.stringify(current);
+      const newStr = JSON.stringify(balances);
+      
+      if (currentStr === newStr) {
+        console.log(`[BalancesStore] Skipping update for ${groupId} - no changes`);
         return;
       }
+      
+      console.log(`[BalancesStore] Updating balances for ${groupId}`, {
+        userBalances: balances.userBalances.length,
+        simplifiedDebts: balances.simplifiedDebts.length,
+      });
+      
       set((state) => ({
         groupBalances: { ...state.groupBalances, [groupId]: balances },
       }));

@@ -27,7 +27,6 @@ export const useListenGroups = () => {
     }
 
     setLoading(true);
-
     const groupsQuery = query(
       fbRefs.userGroups(authUser.uid),
       orderBy("updatedAt", "desc"),
@@ -42,14 +41,19 @@ export const useListenGroups = () => {
           description: data.description || undefined,
           imageUrl: data.imageUrl || undefined,
           currency: data.currency,
-          members: (data.members || []).map((m: FirestoreMemberData): GroupMember => ({
-            userId: m.userId,
-            name: m.name,
-            email: m.email,
-            photoURL: m.photoURL,
-            role: m.role,
-            joinedAt: m.joinedAt && 'toDate' in m.joinedAt ? m.joinedAt.toDate() : new Date(),
-          })),
+          members: (data.members || []).map(
+            (m: FirestoreMemberData): GroupMember => ({
+              userId: m.userId,
+              name: m.name,
+              email: m.email,
+              photoURL: m.photoURL,
+              role: m.role,
+              joinedAt:
+                m.joinedAt && "toDate" in m.joinedAt
+                  ? m.joinedAt.toDate()
+                  : new Date(),
+            }),
+          ),
           createdBy: data.createdBy,
           createdAt: data.createdAt?.toDate() || new Date(),
           updatedAt: data.updatedAt?.toDate() || new Date(),
@@ -68,7 +72,14 @@ export const useListenGroupDetails = (groupId: string | undefined) => {
   const { setSelectedGroup, setLoading } = useGroupsActions();
 
   useEffect(() => {
+    console.log(
+      `[useListenGroupDetails] Setup listener for groupId: ${groupId}`,
+    );
+
     if (!groupId) {
+      console.log(
+        `[useListenGroupDetails] No groupId, clearing selected group`,
+      );
       setSelectedGroup(null);
       return;
     }
@@ -77,6 +88,11 @@ export const useListenGroupDetails = (groupId: string | undefined) => {
 
     const groupRef = fbRefs.groups(groupId);
     const unsubscribe = onSnapshot(groupRef, (doc) => {
+      console.log(`[useListenGroupDetails] Snapshot received for ${groupId}`, {
+        exists: doc.exists(),
+        hasPendingWrites: doc.metadata.hasPendingWrites,
+      });
+
       if (doc.exists()) {
         const data = doc.data();
         const group: Group = {
@@ -85,25 +101,39 @@ export const useListenGroupDetails = (groupId: string | undefined) => {
           description: data.description || undefined,
           imageUrl: data.imageUrl || undefined,
           currency: data.currency,
-          members: (data.members || []).map((m: FirestoreMemberData): GroupMember => ({
-            userId: m.userId,
-            name: m.name,
-            email: m.email,
-            photoURL: m.photoURL,
-            role: m.role,
-            joinedAt: m.joinedAt && 'toDate' in m.joinedAt ? m.joinedAt.toDate() : new Date(),
-          })),
+          members: (data.members || []).map(
+            (m: FirestoreMemberData): GroupMember => ({
+              userId: m.userId,
+              name: m.name,
+              email: m.email,
+              photoURL: m.photoURL,
+              role: m.role,
+              joinedAt:
+                m.joinedAt && "toDate" in m.joinedAt
+                  ? m.joinedAt.toDate()
+                  : new Date(),
+            }),
+          ),
           createdBy: data.createdBy,
           createdAt: data.createdAt?.toDate() || new Date(),
           updatedAt: data.updatedAt?.toDate() || new Date(),
         };
+        console.log(`[useListenGroupDetails] Setting group:`, {
+          id: group.id,
+          name: group.name,
+          memberCount: group.members.length,
+        });
         setSelectedGroup(group);
       } else {
+        console.log(`[useListenGroupDetails] Group not found`);
         setSelectedGroup(null);
       }
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log(`[useListenGroupDetails] Cleanup listener for ${groupId}`);
+      unsubscribe();
+    };
   }, [groupId, setSelectedGroup, setLoading]);
 };

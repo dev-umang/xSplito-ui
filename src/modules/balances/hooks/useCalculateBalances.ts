@@ -16,8 +16,21 @@ export const useCalculateBalances = (group: Group | null) => {
     expenseData: string[];
   } | null>(null);
 
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+
   useEffect(() => {
-    if (!group || !groupId) return;
+    console.log(`[useCalculateBalances] Effect triggered #${renderCountRef.current}`, {
+      hasGroup: !!group,
+      groupId,
+      memberCount: group?.members.length,
+      expenseCount: expenses.length,
+    });
+
+    if (!group || !groupId) {
+      console.log(`[useCalculateBalances] Skipping - no group or groupId`);
+      return;
+    }
 
     // Create current state snapshot
     const memberIds = group.members.map((m) => m.userId).sort();
@@ -33,7 +46,19 @@ export const useCalculateBalances = (group: Group | null) => {
       JSON.stringify(prev.memberIds) !== JSON.stringify(memberIds) ||
       JSON.stringify(prev.expenseData) !== JSON.stringify(expenseData);
 
-    if (!changed) return;
+    if (!changed) {
+      console.log(`[useCalculateBalances] No changes detected - skipping calculation`);
+      return;
+    }
+
+    console.log(`[useCalculateBalances] Changes detected, recalculating...`, {
+      prevGroupId: prev?.groupId,
+      newGroupId: groupId,
+      prevMemberCount: prev?.memberIds.length,
+      newMemberCount: memberIds.length,
+      prevExpenseCount: prev?.expenseData.length,
+      newExpenseCount: expenseData.length,
+    });
 
     // Store current state
     dataRef.current = { groupId, memberIds, expenseData };
@@ -50,6 +75,12 @@ export const useCalculateBalances = (group: Group | null) => {
       })),
     );
 
+    console.log(`[useCalculateBalances] Balances calculated:`, {
+      userBalancesCount: balances.userBalances.length,
+      simplifiedDebtsCount: balances.simplifiedDebts.length,
+    });
+
     setGroupBalances(groupId, balances);
-  }, [groupId, group?.members, expenses, group, setGroupBalances]);
+  }, [groupId, expenses]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: group and setGroupBalances intentionally excluded - we use closure values
 };
