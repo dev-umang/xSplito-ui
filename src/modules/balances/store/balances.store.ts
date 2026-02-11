@@ -1,0 +1,43 @@
+import { create } from "zustand";
+import type { GroupBalances } from "../types/balances.types";
+
+type BalancesStoreType = {
+  groupBalances: Record<string, GroupBalances>; // Balances by groupId
+  loading: boolean;
+  actions: {
+    setGroupBalances: (groupId: string, balances: GroupBalances) => void;
+    setLoading: (loading: boolean) => void;
+    clearGroupBalances: (groupId: string) => void;
+  };
+};
+
+export const useBalancesStore = create<BalancesStoreType>((set, get) => ({
+  groupBalances: {},
+  loading: false,
+  actions: {
+    setGroupBalances: (groupId, balances) => {
+      const current = get().groupBalances[groupId];
+      // Only update if balances actually changed
+      if (JSON.stringify(current) === JSON.stringify(balances)) {
+        return;
+      }
+      set((state) => ({
+        groupBalances: { ...state.groupBalances, [groupId]: balances },
+      }));
+    },
+    setLoading: (loading) => set({ loading }),
+    clearGroupBalances: (groupId) =>
+      set((state) => {
+        const newBalances = { ...state.groupBalances };
+        delete newBalances[groupId];
+        return { groupBalances: newBalances };
+      }),
+  },
+}));
+
+export const useGroupBalances = (groupId: string) =>
+  useBalancesStore((state) => state.groupBalances[groupId]);
+export const useBalancesLoading = () =>
+  useBalancesStore((state) => state.loading);
+export const useBalancesActions = () =>
+  useBalancesStore((state) => state.actions);
