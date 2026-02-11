@@ -94,7 +94,7 @@ export const ProfileSetupPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">Complete Your Profile</CardTitle>

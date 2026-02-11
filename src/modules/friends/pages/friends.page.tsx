@@ -1,6 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,7 +40,8 @@ export const FriendsPage = () => {
   const { rejectRequest } = useRejectFriendRequest();
   const { removeFriend } = useRemoveFriend();
 
-  const getInitials = (name: string) => {
+  const getInitials = (name?: string) => {
+    if (!name) return "";
     return name
       .split(" ")
       .map((n) => n[0])
@@ -43,8 +50,16 @@ export const FriendsPage = () => {
       .substring(0, 2);
   };
 
-  const getFriendDetails = (friendship: { users: string[]; userDetails: Record<string, { name: string; email: string; photoURL?: string }> }) => {
-    const friendId = friendship.users.find((id: string) => id !== authUser?.uid);
+  const getFriendDetails = (friendship: {
+    users: string[];
+    userDetails: Record<
+      string,
+      { name: string; email: string; photoURL?: string }
+    >;
+  }) => {
+    const friendId = friendship.users.find(
+      (id: string) => id !== authUser?.uid,
+    );
     return friendId ? friendship.userDetails[friendId] : null;
   };
 
@@ -119,7 +134,7 @@ export const FriendsPage = () => {
                         request.fromUserId,
                         request.fromUserName,
                         request.fromUserEmail,
-                        request.fromUserPhoto
+                        request.fromUserPhoto,
                       )
                     }
                   >
@@ -213,13 +228,15 @@ export const FriendsPage = () => {
                   >
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarImage src={friend.photoURL} />
-                        <AvatarFallback>{getInitials(friend.name)}</AvatarFallback>
+                        <AvatarImage src={friend?.photoURL || ""} />
+                        <AvatarFallback>
+                          {getInitials(friend?.name || "")}
+                        </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{friend.name}</p>
+                        <p className="font-medium">{friend?.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {friend.email}
+                          {friend?.email}
                         </p>
                       </div>
                     </div>
@@ -227,7 +244,9 @@ export const FriendsPage = () => {
                       size="sm"
                       variant="ghost"
                       className="text-destructive hover:text-destructive"
-                      onClick={() => removeFriend(friendship.id, friend.name)}
+                      onClick={() =>
+                        removeFriend(friendship.id, friend?.name || "")
+                      }
                     >
                       Remove
                     </Button>

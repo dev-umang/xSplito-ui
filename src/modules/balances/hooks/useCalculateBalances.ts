@@ -18,7 +18,7 @@ export const useCalculateBalances = (group: Group | null) => {
 
   useEffect(() => {
     if (!group || !groupId) return;
-    debugger;
+
     // Create current state snapshot
     const memberIds = group.members.map((m) => m.userId).sort();
     const expenseData = expenses
@@ -46,7 +46,7 @@ export const useCalculateBalances = (group: Group | null) => {
         userId: m.userId,
         name: m.name,
         email: m.email,
-        photoURL: m.photoURL,
+        photoURL: m.photoURL || undefined,
       })),
     );
 

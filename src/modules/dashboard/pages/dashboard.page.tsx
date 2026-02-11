@@ -1,5 +1,3 @@
-import { type FC } from "react";
-
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +16,6 @@ import { useListenGroups } from "@/modules/groups/hooks/useListenGroups";
 import { useGroups, useGroupsLoading } from "@/modules/groups/store/groups.store";
 import { useListenFriends } from "@/modules/friends/hooks/useListenFriends";
 import { useFriends, useReceivedRequests } from "@/modules/friends/store/friends.store";
-import { useAuthUser } from "@/modules/auth/store/auth.store";
 import { useUserDetails } from "@/modules/auth/store/user.store";
 
 export const DashboardPage = () => {
@@ -190,7 +187,7 @@ export const DashboardPage = () => {
                           key={member.userId}
                           className="border-2 border-background h-10 w-10"
                         >
-                          <AvatarImage src={member.photoURL} />
+                          <AvatarImage src={member.photoURL || undefined} />
                           <AvatarFallback className="text-xs">
                             {member.name
                               .split(" ")

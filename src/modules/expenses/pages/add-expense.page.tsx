@@ -25,7 +25,11 @@ import { getGroupDetailRoute } from "@/configs/navigation/navigation.constants";
 import { useSelectedGroup } from "@/modules/groups/store/groups.store";
 import { useListenGroupDetails } from "@/modules/groups/hooks/useListenGroups";
 import { useAddExpense } from "../hooks/useExpenseActions";
-import { EXPENSE_CATEGORIES, type SplitType } from "../types/expenses.types";
+import {
+  EXPENSE_CATEGORIES,
+  type SplitType,
+  type ExpenseInput,
+} from "../types/expenses.types";
 import { useAuthUser } from "@/modules/auth/store/auth.store";
 
 export const AddExpensePage = () => {
@@ -48,9 +52,13 @@ export const AddExpensePage = () => {
   });
 
   const [splitType, setSplitType] = useState<SplitType>("equal");
-  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
+    [],
+  );
   const [exactSplits, setExactSplits] = useState<Record<string, string>>({});
-  const [percentageSplits, setPercentageSplits] = useState<Record<string, string>>({});
+  const [percentageSplits, setPercentageSplits] = useState<
+    Record<string, string>
+  >({});
 
   // Auto-select all members and current user as payer
   useEffect(() => {
@@ -65,21 +73,27 @@ export const AddExpensePage = () => {
     setSelectedParticipants((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
+        : [...prev, userId],
     );
   };
 
   const getCurrencySymbol = (currency: string) => {
     const symbols: Record<string, string> = {
-      USD: "$", EUR: "€", GBP: "£", INR: "₹",
-      JPY: "¥", AUD: "A$", CAD: "C$", CNY: "¥",
+      USD: "$",
+      EUR: "€",
+      GBP: "£",
+      INR: "₹",
+      JPY: "¥",
+      AUD: "A$",
+      CAD: "C$",
+      CNY: "¥",
     };
     return symbols[currency] || currency;
   };
 
   const validateForm = () => {
     const amount = parseFloat(formData.amount);
-    
+
     if (!formData.description.trim()) {
       alert("Please enter a description");
       return false;
@@ -130,30 +144,32 @@ export const AddExpensePage = () => {
     }
 
     const amount = parseFloat(formData.amount);
-    const expenseInput = {
+
+    const expenseInput: ExpenseInput = {
       groupId,
       description: formData.description,
       amount,
       category: formData.category,
       paidById: formData.paidById,
       splitType,
+      participantIds: splitType === "equal" ? selectedParticipants : [],
+      exactSplits:
+        splitType === "exact"
+          ? selectedParticipants.map((userId) => ({
+              userId,
+              amount: parseFloat(exactSplits[userId]) || 0,
+            }))
+          : undefined,
+      percentageSplits:
+        splitType === "percentage"
+          ? selectedParticipants.map((userId) => ({
+              userId,
+              percentage: parseFloat(percentageSplits[userId]) || 0,
+            }))
+          : undefined,
       date: new Date(formData.date),
       notes: formData.notes,
     };
-
-    if (splitType === "equal") {
-      expenseInput.participantIds = selectedParticipants;
-    } else if (splitType === "exact") {
-      expenseInput.exactSplits = selectedParticipants.map((userId) => ({
-        userId,
-        amount: parseFloat(exactSplits[userId]) || 0,
-      }));
-    } else if (splitType === "percentage") {
-      expenseInput.percentageSplits = selectedParticipants.map((userId) => ({
-        userId,
-        percentage: parseFloat(percentageSplits[userId]) || 0,
-      }));
-    }
 
     setLoading(true);
     const result = await addExpense(expenseInput);
@@ -168,9 +184,10 @@ export const AddExpensePage = () => {
     return <div className="container p-4">Loading...</div>;
   }
 
-  const equalShare = selectedParticipants.length > 0
-    ? (parseFloat(formData.amount) || 0) / selectedParticipants.length
-    : 0;
+  const equalShare =
+    selectedParticipants.length > 0
+      ? (parseFloat(formData.amount) || 0) / selectedParticipants.length
+      : 0;
 
   return (
     <div className="container max-w-3xl mx-auto p-4 space-y-6">
@@ -200,7 +217,10 @@ export const AddExpensePage = () => {
                 id="description"
                 value={formData.description}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, description: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
                 }
                 placeholder="e.g., Dinner at restaurant"
                 disabled={loading}
@@ -220,7 +240,10 @@ export const AddExpensePage = () => {
                     step="0.01"
                     value={formData.amount}
                     onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, amount: e.target.value }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        amount: e.target.value,
+                      }))
                     }
                     placeholder="0.00"
                     disabled={loading}
@@ -311,7 +334,10 @@ export const AddExpensePage = () => {
             <CardDescription>Select how to divide this expense</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Tabs value={splitType} onValueChange={(v) => setSplitType(v as SplitType)}>
+            <Tabs
+              value={splitType}
+              onValueChange={(v) => setSplitType(v as SplitType)}
+            >
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="equal">Equal</TabsTrigger>
                 <TabsTrigger value="exact">Exact</TabsTrigger>
@@ -324,16 +350,22 @@ export const AddExpensePage = () => {
                   {equalShare.toFixed(2)} per person
                 </p>
                 {group.members.map((member) => (
-                  <div key={member.userId} className="flex items-center gap-3 p-2 border rounded">
+                  <div
+                    key={member.userId}
+                    className="flex items-center gap-3 p-2 border rounded"
+                  >
                     <Checkbox
                       checked={selectedParticipants.includes(member.userId)}
-                      onCheckedChange={() => handleParticipantToggle(member.userId)}
+                      onCheckedChange={() =>
+                        handleParticipantToggle(member.userId)
+                      }
                       disabled={loading}
                     />
                     <span className="flex-1">{member.name}</span>
                     {selectedParticipants.includes(member.userId) && (
                       <span className="text-sm text-muted-foreground">
-                        {getCurrencySymbol(group.currency)}{equalShare.toFixed(2)}
+                        {getCurrencySymbol(group.currency)}
+                        {equalShare.toFixed(2)}
                       </span>
                     )}
                   </div>
@@ -348,7 +380,9 @@ export const AddExpensePage = () => {
                   <div key={member.userId} className="flex items-center gap-3">
                     <Checkbox
                       checked={selectedParticipants.includes(member.userId)}
-                      onCheckedChange={() => handleParticipantToggle(member.userId)}
+                      onCheckedChange={() =>
+                        handleParticipantToggle(member.userId)
+                      }
                       disabled={loading}
                     />
                     <span className="flex-1">{member.name}</span>
@@ -380,7 +414,9 @@ export const AddExpensePage = () => {
                   <div key={member.userId} className="flex items-center gap-3">
                     <Checkbox
                       checked={selectedParticipants.includes(member.userId)}
-                      onCheckedChange={() => handleParticipantToggle(member.userId)}
+                      onCheckedChange={() =>
+                        handleParticipantToggle(member.userId)
+                      }
                       disabled={loading}
                     />
                     <span className="flex-1">{member.name}</span>
