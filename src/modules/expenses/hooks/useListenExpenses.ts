@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { onSnapshot, orderBy, query } from "firebase/firestore";
 import { fbRefs } from "@/configs/firebase/firebase.nodes";
-import { useExpensesActions } from "../store/expenses.store";
+import { useExpensesStore } from "../store/expenses.store";
 import type { Expense } from "../types/expenses.types";
 
 export const useListenGroupExpenses = (groupId: string | undefined) => {
-  const { setGroupExpenses, setLoading } = useExpensesActions();
+  const actionsRef = useRef(useExpensesStore.getState().actions);
 
   useEffect(() => {
     console.log(
@@ -17,47 +17,54 @@ export const useListenGroupExpenses = (groupId: string | undefined) => {
       return;
     }
 
-    setLoading(true);
+    actionsRef.current.setLoading(true);
 
     const expensesQuery = query(
       fbRefs.groupExpenses(groupId),
       orderBy("date", "desc"),
     );
 
-    const unsubscribe = onSnapshot(expensesQuery, (snapshot) => {
-      console.log(`[useListenGroupExpenses] Snapshot received for ${groupId}`, {
-        expenseCount: snapshot.docs.length,
-        hasPendingWrites: snapshot.metadata.hasPendingWrites,
-      });
+    const unsubscribe = onSnapshot(
+      expensesQuery,
+      (snapshot) => {
+        console.log(`[useListenGroupExpenses] Snapshot received for ${groupId}`, {
+          expenseCount: snapshot.docs.length,
+          hasPendingWrites: snapshot.metadata.hasPendingWrites,
+        });
 
-      const expenses: Expense[] = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          groupId: data.groupId,
-          groupName: data.groupName,
-          description: data.description,
-          amount: data.amount,
-          currency: data.currency,
-          category: data.category,
-          paidBy: data.paidBy,
-          splitType: data.splitType,
-          participants: data.participants,
-          date: data.date?.toDate() || new Date(),
-          notes: data.notes,
-          createdBy: data.createdBy,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-        };
-      });
+        const expenses: Expense[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            groupId: data.groupId,
+            groupName: data.groupName,
+            description: data.description,
+            amount: data.amount,
+            currency: data.currency,
+            category: data.category,
+            paidBy: data.paidBy,
+            splitType: data.splitType,
+            participants: data.participants,
+            date: data.date?.toDate() || new Date(),
+            notes: data.notes,
+            createdBy: data.createdBy,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate() || new Date(),
+          };
+        });
 
-      setGroupExpenses(groupId, expenses);
-      setLoading(false);
-    });
+        actionsRef.current.setGroupExpenses(groupId, expenses);
+        actionsRef.current.setLoading(false);
+      },
+      (error) => {
+        console.error(`[useListenGroupExpenses] Error for ${groupId}:`, error);
+        actionsRef.current.setLoading(false);
+      }
+    );
 
     return () => {
       console.log(`[useListenGroupExpenses] Cleanup listener for ${groupId}`);
       unsubscribe();
     };
-  }, [groupId, setGroupExpenses, setLoading]);
+  }, [groupId]);
 };

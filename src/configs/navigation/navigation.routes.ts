@@ -30,6 +30,12 @@ const GroupDetailPage = lazy(
 const AddExpensePage = lazy(
   () => import("@/modules/expenses/pages/add-expense.page")
 );
+const ActivityPage = lazy(
+  () => import("@/modules/activity/pages/activity.page")
+);
+const ProfilePage = lazy(
+  () => import("@/modules/profile/pages/profile.page")
+);
 const MigratePage = lazy(
   () => import("@/modules/admin/pages/migrate.page")
 );
@@ -51,6 +57,8 @@ export const NavigationRoutes: RouteObject[] = [
       route("CREATE_GROUP", CreateGroupPage),
       route("GROUP_DETAIL", GroupDetailPage),
       route("ADD_EXPENSE", AddExpensePage),
+      route("ACTIVITY", ActivityPage),
+      route("PROFILE", ProfilePage),
       route("MIGRATE", MigratePage), // Temporary migration
     ]),
   ]),

@@ -91,6 +91,7 @@ const useThemeStore = create<ThemeStoreType>((set, get) => ({
 // ==== SELECTOR ====
 export const useDarkMode = () => useThemeStore((s) => s.mode) === "dark";
 export const useThemeMode = () => useThemeStore((s) => s.mode);
+export const useThemePreferences = () => useThemeStore((s) => s.preferences);
 
 // ==== ACTIONS ====
 export const useThemeActions = () => useThemeStore((s) => s.actions);

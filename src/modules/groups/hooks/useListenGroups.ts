@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
 import { fbRefs } from "@/configs/firebase/firebase.nodes";
 import { useAuthUser } from "@/modules/auth/store/auth.store";
-import { useGroupsActions } from "../store/groups.store";
+import { useGroupsStore } from "../store/groups.store";
 import type { Group, GroupMember } from "../types/groups.types";
 
 // Type for raw Firestore member data
@@ -17,16 +17,16 @@ interface FirestoreMemberData {
 
 export const useListenGroups = () => {
   const authUser = useAuthUser();
-  const { setGroups, setLoading } = useGroupsActions();
+  const actionsRef = useRef(useGroupsStore.getState().actions);
 
   useEffect(() => {
     if (!authUser?.uid) {
-      setGroups([]);
-      setLoading(false);
+      actionsRef.current.setGroups([]);
+      actionsRef.current.setLoading(false);
       return;
     }
 
-    setLoading(true);
+    actionsRef.current.setLoading(true);
     const groupsQuery = query(
       fbRefs.userGroups(authUser.uid),
       orderBy("updatedAt", "desc"),
@@ -60,16 +60,16 @@ export const useListenGroups = () => {
         };
       });
 
-      setGroups(groups);
-      setLoading(false);
+      actionsRef.current.setGroups(groups);
+      actionsRef.current.setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [authUser?.uid, setGroups, setLoading]);
+  }, [authUser?.uid]);
 };
 
 export const useListenGroupDetails = (groupId: string | undefined) => {
-  const { setSelectedGroup, setLoading } = useGroupsActions();
+  const actionsRef = useRef(useGroupsStore.getState().actions);
 
   useEffect(() => {
     console.log(
@@ -80,11 +80,11 @@ export const useListenGroupDetails = (groupId: string | undefined) => {
       console.log(
         `[useListenGroupDetails] No groupId, clearing selected group`,
       );
-      setSelectedGroup(null);
+      actionsRef.current.setSelectedGroup(null);
       return;
     }
 
-    setLoading(true);
+    actionsRef.current.setLoading(true);
 
     const groupRef = fbRefs.groups(groupId);
     const unsubscribe = onSnapshot(groupRef, (doc) => {
@@ -123,17 +123,17 @@ export const useListenGroupDetails = (groupId: string | undefined) => {
           name: group.name,
           memberCount: group.members.length,
         });
-        setSelectedGroup(group);
+        actionsRef.current.setSelectedGroup(group);
       } else {
         console.log(`[useListenGroupDetails] Group not found`);
-        setSelectedGroup(null);
+        actionsRef.current.setSelectedGroup(null);
       }
-      setLoading(false);
+      actionsRef.current.setLoading(false);
     });
 
     return () => {
       console.log(`[useListenGroupDetails] Cleanup listener for ${groupId}`);
       unsubscribe();
     };
-  }, [groupId, setSelectedGroup, setLoading]);
+  }, [groupId]);
 };

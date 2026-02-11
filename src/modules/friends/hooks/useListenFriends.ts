@@ -1,25 +1,24 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { fbRefs } from "@/configs/firebase/firebase.nodes";
 import { useAuthUser } from "@/modules/auth/store/auth.store";
-import { useFriendsActions } from "../store/friends.store";
+import { useFriendsStore } from "../store/friends.store";
 import type { Friendship, FriendRequest } from "../types/friends.types";
 
 export const useListenFriends = () => {
   const authUser = useAuthUser();
-  const { setFriends, setReceivedRequests, setSentRequests, setLoading } =
-    useFriendsActions();
+  const actionsRef = useRef(useFriendsStore.getState().actions);
 
   useEffect(() => {
     if (!authUser?.uid) {
-      setFriends([]);
-      setReceivedRequests([]);
-      setSentRequests([]);
-      setLoading(false);
+      actionsRef.current.setFriends([]);
+      actionsRef.current.setReceivedRequests([]);
+      actionsRef.current.setSentRequests([]);
+      actionsRef.current.setLoading(false);
       return;
     }
 
-    setLoading(true);
+    actionsRef.current.setLoading(true);
     const unsubscribers: (() => void)[] = [];
 
     // Listen to friendships
@@ -34,8 +33,8 @@ export const useListenFriends = () => {
           createdAt: data.createdAt?.toDate() || new Date(),
         };
       });
-      setFriends(friendships);
-      setLoading(false);
+      actionsRef.current.setFriends(friendships);
+      actionsRef.current.setLoading(false);
     });
     unsubscribers.push(unsubFriendships);
 
@@ -58,7 +57,7 @@ export const useListenFriends = () => {
           updatedAt: data.updatedAt?.toDate() || new Date(),
         };
       });
-      setReceivedRequests(requests);
+      actionsRef.current.setReceivedRequests(requests);
     });
     unsubscribers.push(unsubReceived);
 
@@ -81,18 +80,12 @@ export const useListenFriends = () => {
           updatedAt: data.updatedAt?.toDate() || new Date(),
         };
       });
-      setSentRequests(requests);
+      actionsRef.current.setSentRequests(requests);
     });
     unsubscribers.push(unsubSent);
 
     return () => {
       unsubscribers.forEach((unsub) => unsub());
     };
-  }, [
-    authUser?.uid,
-    setFriends,
-    setReceivedRequests,
-    setSentRequests,
-    setLoading,
-  ]);
+  }, [authUser?.uid]);
 };

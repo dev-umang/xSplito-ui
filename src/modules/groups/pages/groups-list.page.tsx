@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,20 +11,76 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Users, ChevronRight, FolderOpen } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, Users, ChevronRight, FolderOpen, Search, TrendingUp, TrendingDown } from "lucide-react";
 import {
   ROUTES,
   getGroupDetailRoute,
 } from "@/configs/navigation/navigation.constants";
 import { useListenGroups } from "../hooks/useListenGroups";
 import { useGroups, useGroupsLoading } from "../store/groups.store";
+import { useAuthUser } from "@/modules/auth/store/auth.store";
+import { useExpensesStore } from "@/modules/expenses/store/expenses.store";
+import { calculateGroupBalances, getUserDebts } from "@/modules/balances/utils/balance.utils";
 
 export const GroupsListPage = () => {
   const navigate = useNavigate();
+  const authUser = useAuthUser();
+  const [searchQuery, setSearchQuery] = useState("");
+  
   useListenGroups(); // Start listening to groups
 
   const groups = useGroups();
   const loading = useGroupsLoading();
+  const expensesStore = useExpensesStore();
+
+  // Calculate user's net balance for each group
+  const groupBalances = useMemo(() => {
+    if (!authUser) return {};
+    
+    const balances: Record<string, number> = {};
+    groups.forEach((group) => {
+      const expenses = expensesStore.groupExpenses[group.id] || [];
+      const members = group.members.map(m => ({
+        userId: m.userId,
+        name: m.name,
+        email: m.email,
+        photoURL: m.photoURL || undefined,
+      }));
+      const groupBalances = calculateGroupBalances(
+        group.id,
+        expenses,
+        members
+      );
+      
+      const userDebts = getUserDebts(authUser.uid, groupBalances.simplifiedDebts);
+      
+      // Calculate net balance: what I'm owed minus what I owe
+      const owed = userDebts.owed.reduce((sum, debt) => sum + debt.amount, 0);
+      const owes = userDebts.owes.reduce((sum, debt) => sum + debt.amount, 0);
+      const netBalance = owed - owes;
+      
+      balances[group.id] = netBalance;
+    });
+    
+    return balances;
+  }, [groups, expensesStore.groupExpenses, authUser]);
+
+  // Filter groups based on search query
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery.trim()) return groups;
+    
+    const query = searchQuery.toLowerCase();
+    return groups.filter((group) => {
+      return (
+        group.name.toLowerCase().includes(query) ||
+        group.description?.toLowerCase().includes(query) ||
+        group.members.some((member) => 
+          member.name.toLowerCase().includes(query)
+        )
+      );
+    });
+  }, [groups, searchQuery]);
 
   const getCurrencySymbol = (currency: string) => {
     const symbols: Record<string, string> = {
@@ -71,6 +128,20 @@ export const GroupsListPage = () => {
         </Button>
       </div>
 
+      {/* Search Bar */}
+      {groups.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search groups, members..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      )}
+
       {/* Groups Grid */}
       {groups.length === 0 ? (
         <Card>
@@ -88,75 +159,119 @@ export const GroupsListPage = () => {
             </div>
           </CardContent>
         </Card>
+      ) : filteredGroups.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
+              <Search className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No groups found</h3>
+              <p className="text-muted-foreground mb-6">
+                Try adjusting your search query
+              </p>
+              <Button variant="outline" onClick={() => setSearchQuery("")}>
+                Clear Search
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {groups.map((group) => (
-            <Card
-              key={group.id}
-              className="hover:shadow-lg transition-shadow cursor-pointer group"
-              onClick={() => navigate(getGroupDetailRoute(group.id))}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="flex items-center gap-2 group-hover:text-primary transition-colors">
-                      {group.name}
-                      <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </CardTitle>
-                    {group.description && (
-                      <CardDescription className="mt-2 line-clamp-2">
-                        {group.description}
-                      </CardDescription>
-                    )}
+          {filteredGroups.map((group) => {
+            const balance = groupBalances[group.id] || 0;
+            const hasBalance = Math.abs(balance) > 0.01;
+            const isOwed = balance > 0;
+            
+            return (
+              <Card
+                key={group.id}
+                className="hover:shadow-lg transition-shadow cursor-pointer group"
+                onClick={() => navigate(getGroupDetailRoute(group.id))}
+              >
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="flex items-center gap-2 group-hover:text-primary transition-colors">
+                        {group.name}
+                        <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </CardTitle>
+                      {group.description && (
+                        <CardDescription className="mt-2 line-clamp-2">
+                          {group.description}
+                        </CardDescription>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Currency Badge */}
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">
-                    {getCurrencySymbol(group.currency)} {group.currency}
-                  </Badge>
-                </div>
-
-                {/* Members */}
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    {group.members.length} member
-                    {group.members.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-
-                {/* Member Avatars */}
-                <div className="flex -space-x-2">
-                  {group.members.slice(0, 5).map((member) => (
-                    <Avatar
-                      key={member.userId}
-                      className="border-2 border-background h-8 w-8"
-                    >
-                      <AvatarImage src={member.photoURL || ""} />
-                      <AvatarFallback className="text-xs">
-                        {member.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()
-                          .substring(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                  ))}
-                  {group.members.length > 5 && (
-                    <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
-                      <span className="text-xs font-medium">
-                        +{group.members.length - 5}
-                      </span>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Balance Badge */}
+                  {hasBalance && (
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={isOwed ? "default" : "destructive"}
+                        className={
+                          isOwed
+                            ? "bg-green-500 hover:bg-green-600"
+                            : "bg-orange-500 hover:bg-orange-600"
+                        }
+                      >
+                        {isOwed ? (
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3 mr-1" />
+                        )}
+                        {isOwed ? "+" : ""}
+                        {getCurrencySymbol(group.currency)}
+                        {Math.abs(balance).toFixed(2)}
+                      </Badge>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                  {/* Currency Badge */}
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      {getCurrencySymbol(group.currency)} {group.currency}
+                    </Badge>
+                  </div>
+
+                  {/* Members */}
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      {group.members.length} member
+                      {group.members.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+
+                  {/* Member Avatars */}
+                  <div className="flex -space-x-2">
+                    {group.members.slice(0, 5).map((member) => (
+                      <Avatar
+                        key={member.userId}
+                        className="border-2 border-background h-8 w-8"
+                      >
+                        <AvatarImage src={member.photoURL || ""} />
+                        <AvatarFallback className="text-xs">
+                          {member.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .toUpperCase()
+                            .substring(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                    {group.members.length > 5 && (
+                      <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+                        <span className="text-xs font-medium">
+                          +{group.members.length - 5}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

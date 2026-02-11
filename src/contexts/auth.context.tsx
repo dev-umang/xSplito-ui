@@ -3,7 +3,7 @@ import { useListenAuthState } from "@/modules/auth/hooks/useListenAuthState";
 import useListenUserDetails from "@/modules/auth/hooks/useListenUserDetails";
 import { signOut } from "firebase/auth";
 import type { Unsubscribe } from "firebase/firestore";
-import {
+import React, {
   createContext,
   useEffect,
   useRef,
@@ -84,3 +84,11 @@ export const AuthProvider: FC<PropsWithChildren> = ({ children }) => {
 };
 
 export { AuthContext };
+
+export const useAuthContext = () => {
+  const context = React.useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuthContext must be used within AuthProvider");
+  }
+  return context;
+};

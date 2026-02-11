@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 import { useGroupExpenses } from "@/modules/expenses/store/expenses.store";
-import { useBalancesActions } from "../store/balances.store";
+import { useBalancesStore } from "../store/balances.store";
 import { calculateGroupBalances } from "../utils/balance.utils";
 import type { Group } from "@/modules/groups/types/groups.types";
 
 export const useCalculateBalances = (group: Group | null) => {
   const groupId = group?.id;
   const expenses = useGroupExpenses(groupId || "");
-  const { setGroupBalances } = useBalancesActions();
+  const actionsRef = useRef(useBalancesStore.getState().actions);
 
   // Use ref to store group and expenses to compare
   const dataRef = useRef<{
@@ -80,7 +80,8 @@ export const useCalculateBalances = (group: Group | null) => {
       simplifiedDebtsCount: balances.simplifiedDebts.length,
     });
 
-    setGroupBalances(groupId, balances);
-  }, [groupId, expenses]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Note: group and setGroupBalances intentionally excluded - we use closure values
+    actionsRef.current.setGroupBalances(groupId, balances);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, expenses]);
+  // Note: 'group' object is compared internally via groupId and member changes
 };

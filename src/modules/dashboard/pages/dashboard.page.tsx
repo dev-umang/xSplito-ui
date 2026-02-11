@@ -17,6 +17,7 @@ import { useGroups, useGroupsLoading } from "@/modules/groups/store/groups.store
 import { useListenFriends } from "@/modules/friends/hooks/useListenFriends";
 import { useFriends, useReceivedRequests } from "@/modules/friends/store/friends.store";
 import { useUserDetails } from "@/modules/auth/store/user.store";
+import BalanceSummary from "../components/balance-summary";
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
@@ -55,6 +56,9 @@ export const DashboardPage = () => {
           Here's an overview of your expense groups
         </p>
       </div>
+
+      {/* Balance Summary */}
+      <BalanceSummary />
 
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-3">
