@@ -17,6 +17,8 @@ export type Group = {
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
+  archived?: boolean;
+  archivedAt?: Date;
 };
 
 export type GroupInput = {

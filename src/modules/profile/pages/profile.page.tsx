@@ -1,4 +1,5 @@
-import { Mail, DollarSign, LogOut, Settings, Moon, Sun, Laptop } from "lucide-react";
+import { Mail, DollarSign, LogOut, Settings, Moon, Sun, Laptop, Receipt } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -13,8 +14,10 @@ import { Separator } from "@/components/ui/separator";
 import { useUserDetails } from "@/modules/auth/store/user.store";
 import { useAuthContext } from "@/contexts/auth.context";
 import { useThemePreferences, useThemeActions } from "@/configs/theme/theme.store";
+import { ROUTES } from "@/configs/navigation/navigation.constants";
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
   const userDetails = useUserDetails();
   const { logout } = useAuthContext();
   const preferences = useThemePreferences();
@@ -149,7 +152,15 @@ const ProfilePage = () => {
           <Button
             variant="outline"
             className="w-full justify-start"
-            onClick={() => {}}
+            onClick={() => navigate(ROUTES.ACTIVITY)}
+          >
+            <Receipt className="h-4 w-4 mr-2" />
+            View Activity
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => navigate(ROUTES.EDIT_PROFILE)}
           >
             <Settings className="h-4 w-4 mr-2" />
             Edit Profile

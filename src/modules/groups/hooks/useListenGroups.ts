@@ -33,32 +33,35 @@ export const useListenGroups = () => {
     );
 
     const unsubscribe = onSnapshot(groupsQuery, (snapshot) => {
-      const groups: Group[] = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.name,
-          description: data.description || undefined,
-          imageUrl: data.imageUrl || undefined,
-          currency: data.currency,
-          members: (data.members || []).map(
-            (m: FirestoreMemberData): GroupMember => ({
-              userId: m.userId,
-              name: m.name,
-              email: m.email,
-              photoURL: m.photoURL,
-              role: m.role,
-              joinedAt:
-                m.joinedAt && "toDate" in m.joinedAt
-                  ? m.joinedAt.toDate()
-                  : new Date(),
-            }),
-          ),
-          createdBy: data.createdBy,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-        };
-      });
+      const groups: Group[] = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name,
+            description: data.description || undefined,
+            imageUrl: data.imageUrl || undefined,
+            currency: data.currency,
+            members: (data.members || []).map(
+              (m: FirestoreMemberData): GroupMember => ({
+                userId: m.userId,
+                name: m.name,
+                email: m.email,
+                photoURL: m.photoURL,
+                role: m.role,
+                joinedAt:
+                  m.joinedAt && "toDate" in m.joinedAt
+                    ? m.joinedAt.toDate()
+                    : new Date(),
+              }),
+            ),
+            createdBy: data.createdBy,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate() || new Date(),
+            archived: data.archived || false,
+            archivedAt: data.archivedAt?.toDate() || undefined,
+          };
+        });
 
       actionsRef.current.setGroups(groups);
       actionsRef.current.setLoading(false);
@@ -117,6 +120,8 @@ export const useListenGroupDetails = (groupId: string | undefined) => {
           createdBy: data.createdBy,
           createdAt: data.createdAt?.toDate() || new Date(),
           updatedAt: data.updatedAt?.toDate() || new Date(),
+          archived: data.archived || false,
+          archivedAt: data.archivedAt?.toDate() || undefined,
         };
         console.log(`[useListenGroupDetails] Setting group:`, {
           id: group.id,

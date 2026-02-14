@@ -1,11 +1,13 @@
 import type { Expense } from "@/modules/expenses/types/expenses.types";
+import type { Settlement } from "@/modules/settlements/types/settlements.types";
 import type { UserBalance, DebtEdge, GroupBalances } from "../types/balances.types";
 
 /**
- * Calculate individual user balances from expenses
+ * Calculate individual user balances from expenses and settlements
  */
 export const calculateUserBalances = (
   expenses: Expense[],
+  settlements: Settlement[],
   groupMembers: { userId: string; name: string; email: string; photoURL?: string }[]
 ): UserBalance[] => {
   const balances: Record<string, UserBalance> = {};
@@ -36,6 +38,18 @@ export const calculateUserBalances = (
         balances[participant.userId].totalOwed += participant.amount;
       }
     });
+  });
+
+  // Apply settlements - they adjust the net balance
+  // When fromUser pays toUser, fromUser's balance increases (paid off debt)
+  // and toUser's balance decreases (received payment)
+  settlements.forEach((settlement) => {
+    if (balances[settlement.fromUser.userId]) {
+      balances[settlement.fromUser.userId].totalPaid += settlement.amount;
+    }
+    if (balances[settlement.toUser.userId]) {
+      balances[settlement.toUser.userId].totalOwed -= settlement.amount;
+    }
   });
 
   // Calculate net balances
@@ -99,9 +113,10 @@ export const simplifyDebts = (userBalances: UserBalance[]): DebtEdge[] => {
 export const calculateGroupBalances = (
   groupId: string,
   expenses: Expense[],
+  settlements: Settlement[],
   groupMembers: { userId: string; name: string; email: string; photoURL?: string }[]
 ): GroupBalances => {
-  const userBalances = calculateUserBalances(expenses, groupMembers);
+  const userBalances = calculateUserBalances(expenses, settlements, groupMembers);
   const simplifiedDebts = simplifyDebts(userBalances);
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 

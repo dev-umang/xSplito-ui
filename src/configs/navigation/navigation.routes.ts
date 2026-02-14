@@ -21,6 +21,9 @@ const AddFriendPage = lazy(
 const GroupsListPage = lazy(
   () => import("@/modules/groups/pages/groups-list.page")
 );
+const ArchivedGroupsPage = lazy(
+  () => import("@/modules/groups/pages/archived-groups.page")
+);
 const CreateGroupPage = lazy(
   () => import("@/modules/groups/pages/create-group.page")
 );
@@ -35,6 +38,12 @@ const ActivityPage = lazy(
 );
 const ProfilePage = lazy(
   () => import("@/modules/profile/pages/profile.page")
+);
+const EditProfilePage = lazy(
+  () => import("@/modules/profile/pages/edit-profile.page")
+);
+const AddSettlementPage = lazy(
+  () => import("@/modules/settlements/pages/add-settlement.page")
 );
 const MigratePage = lazy(
   () => import("@/modules/admin/pages/migrate.page")
@@ -54,11 +63,14 @@ export const NavigationRoutes: RouteObject[] = [
       route("FRIENDS", FriendsPage),
       route("ADD_FRIEND", AddFriendPage),
       route("GROUPS", GroupsListPage),
+      route("ARCHIVED_GROUPS", ArchivedGroupsPage),
       route("CREATE_GROUP", CreateGroupPage),
       route("GROUP_DETAIL", GroupDetailPage),
       route("ADD_EXPENSE", AddExpensePage),
       route("ACTIVITY", ActivityPage),
       route("PROFILE", ProfilePage),
+      route("EDIT_PROFILE", EditProfilePage),
+      route("ADD_SETTLEMENT", AddSettlementPage),
       route("MIGRATE", MigratePage), // Temporary migration
     ]),
   ]),

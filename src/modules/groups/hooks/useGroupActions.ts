@@ -4,6 +4,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
   serverTimestamp,
   getDocs,
   query,
@@ -144,6 +145,56 @@ export const useDeleteGroup = () => {
   return { deleteGroup };
 };
 
+export const useArchiveGroup = () => {
+  const archiveGroup = useCallback(
+    async (groupId: string, groupName: string) => {
+      try {
+        const groupRef = doc(fbStore, fbNodes.groups, groupId);
+        await updateDoc(groupRef, {
+          archived: true,
+          archivedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        toast.success(`Group "${groupName}" archived successfully`);
+        return { success: true };
+      } catch (error) {
+        console.error("Error archiving group:", error);
+        toast.error("Failed to archive group");
+        return { success: false };
+      }
+    },
+    []
+  );
+
+  return { archiveGroup };
+};
+
+export const useUnarchiveGroup = () => {
+  const unarchiveGroup = useCallback(
+    async (groupId: string, groupName: string) => {
+      try {
+        const groupRef = doc(fbStore, fbNodes.groups, groupId);
+        await updateDoc(groupRef, {
+          archived: false,
+          archivedAt: null,
+          updatedAt: serverTimestamp(),
+        });
+
+        toast.success(`Group "${groupName}" unarchived successfully`);
+        return { success: true };
+      } catch (error) {
+        console.error("Error unarchiving group:", error);
+        toast.error("Failed to unarchive group");
+        return { success: false };
+      }
+    },
+    []
+  );
+
+  return { unarchiveGroup };
+};
+
 export const useAddGroupMember = () => {
   const addMember = useCallback(
     async (groupId: string, memberEmail: string) => {
@@ -163,13 +214,14 @@ export const useAddGroupMember = () => {
 
         // Get current group
         const groupRef = doc(fbStore, fbNodes.groups, groupId);
-        const groupDoc = await getDocs(query(fbRefs.groupsCollection()));
-        const groupData = groupDoc.docs.find((d) => d.id === groupId)?.data();
+        const groupDoc = await getDoc(groupRef);
 
-        if (!groupData) {
+        if (!groupDoc.exists()) {
           toast.error("Group not found");
           return { success: false };
         }
+
+        const groupData = groupDoc.data();
 
         // Check if user is already a member
         const members = (groupData.members || []) as GroupMember[];
@@ -213,13 +265,14 @@ export const useRemoveGroupMember = () => {
     async (groupId: string, userId: string, memberName: string) => {
       try {
         const groupRef = doc(fbStore, fbNodes.groups, groupId);
-        const groupDoc = await getDocs(query(fbRefs.groupsCollection()));
-        const groupData = groupDoc.docs.find((d) => d.id === groupId)?.data();
+        const groupDoc = await getDoc(groupRef);
 
-        if (!groupData) {
+        if (!groupDoc.exists()) {
           toast.error("Group not found");
           return { success: false };
         }
+
+        const groupData = groupDoc.data();
 
         const members = ((groupData.members || []) as GroupMember[]).filter(
           (m) => m.userId !== userId

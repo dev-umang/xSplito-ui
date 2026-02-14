@@ -6,6 +6,7 @@ export const ROUTES = {
   FRIENDS: "/friends",
   ADD_FRIEND: "/friends/add",
   GROUPS: "/groups",
+  ARCHIVED_GROUPS: "/groups/archived",
   CREATE_GROUP: "/groups/create",
   GROUP_DETAIL: "/groups/:id",
   EDIT_GROUP: "/groups/:id/edit",

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useGroups } from "@/modules/groups/store/groups.store";
 import { useExpensesStore } from "@/modules/expenses/store/expenses.store";
+import { useSettlementsStore } from "@/modules/settlements/store/settlements.store";
 import { useAuthUser } from "@/modules/auth/store/auth.store";
 import { calculateGroupBalances, getUserDebts } from "@/modules/balances/utils/balance.utils";
 
@@ -30,6 +31,7 @@ export const useUserTotalBalances = (): UserTotalBalance | null => {
   const authUser = useAuthUser();
   const groups = useGroups();
   const expensesStore = useExpensesStore();
+  const settlementsStore = useSettlementsStore();
 
   return useMemo(() => {
     if (!authUser) return null;
@@ -41,12 +43,14 @@ export const useUserTotalBalances = (): UserTotalBalance | null => {
 
     groups.forEach((group) => {
       const expenses = expensesStore.groupExpenses[group.id] || [];
+      const settlements = settlementsStore.settlements.filter(s => s.groupId === group.id);
       
-      if (expenses.length === 0) return;
+      if (expenses.length === 0 && settlements.length === 0) return;
 
       const balances = calculateGroupBalances(
         group.id,
         expenses,
+        settlements,
         group.members.map((m) => ({
           userId: m.userId,
           name: m.name,
@@ -93,5 +97,5 @@ export const useUserTotalBalances = (): UserTotalBalance | null => {
       debts,
       credits,
     };
-  }, [authUser, groups, expensesStore.groupExpenses]);
+  }, [authUser, groups, expensesStore.groupExpenses, settlementsStore.settlements]);
 };

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useMemo } from "react";
 import type { GroupBalances } from "../types/balances.types";
 
 type BalancesStoreType = {
@@ -47,6 +48,12 @@ export const useBalancesStore = create<BalancesStoreType>((set, get) => ({
 
 export const useGroupBalances = (groupId: string) =>
   useBalancesStore((state) => state.groupBalances[groupId]);
+
+export const useBalances = (): GroupBalances[] => {
+  const groupBalances = useBalancesStore((state) => state.groupBalances);
+  return useMemo(() => Object.values(groupBalances), [groupBalances]);
+};
+
 export const useBalancesLoading = () =>
   useBalancesStore((state) => state.loading);
 export const useBalancesActions = () =>

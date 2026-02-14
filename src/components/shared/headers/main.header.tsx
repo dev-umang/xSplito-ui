@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useDarkMode, useThemeActions } from "@/configs/theme/theme.store";
-import { Moon, Sun, User, Settings, LogOut, Menu } from "lucide-react";
+import { Moon, Sun, User, Settings, LogOut } from "lucide-react";
 import { type FC, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "@/configs/navigation/navigation.constants";
@@ -67,39 +67,15 @@ const MainHeader: FC = () => {
             variant="ghost"
             size="icon"
             onClick={() => updatePreferences(darkMode ? "light" : "dark")}
+            className="hidden md:flex"
           >
             {darkMode ? <Sun size={16} /> : <Moon size={16} />}
           </Button>
 
-          {/* Mobile Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
-                <Menu size={20} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => navigate(ROUTES.DASHBOARD)}>
-                Dashboard
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate(ROUTES.GROUPS)}>
-                Groups
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate(ROUTES.FRIENDS)}>
-                Friends
-                {receivedRequests.length > 0 && (
-                  <Badge variant="destructive" className="ml-auto">
-                    {receivedRequests.length}
-                  </Badge>
-                )}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* User Menu */}
+          {/* User Menu - Desktop Only */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 hidden md:flex">
                 <Avatar>
                   <AvatarImage src={authUser?.photoURL || ""} />
                   <AvatarFallback>

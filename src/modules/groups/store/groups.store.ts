@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useMemo } from "react";
 import type { Group } from "../types/groups.types";
 
 type GroupsStoreType = {
@@ -45,7 +46,26 @@ export const useGroupsStore = create<GroupsStoreType>((set) => ({
 }));
 
 export const useGroups = () => useGroupsStore((state) => state.groups);
+export const useGroup = (groupId: string) =>
+  useGroupsStore((state) => state.groups.find((g) => g.id === groupId) || null);
 export const useSelectedGroup = () =>
   useGroupsStore((state) => state.selectedGroup);
 export const useGroupsLoading = () => useGroupsStore((state) => state.loading);
 export const useGroupsActions = () => useGroupsStore((state) => state.actions);
+
+// Filtered selectors - memoized to prevent infinite loops
+export const useActiveGroups = (): Group[] => {
+  const allGroups = useGroupsStore((state) => state.groups);
+  
+  return useMemo(() => {
+    return allGroups.filter((g) => !g.archived);
+  }, [allGroups]);
+};
+
+export const useArchivedGroups = (): Group[] => {
+  const allGroups = useGroupsStore((state) => state.groups);
+  
+  return useMemo(() => {
+    return allGroups.filter((g) => g.archived === true);
+  }, [allGroups]);
+};

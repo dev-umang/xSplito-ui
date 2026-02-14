@@ -1,9 +1,27 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { doc, onSnapshot, query, where, orderBy, collection, Timestamp } from "firebase/firestore";
+import {
+  doc,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+  collection,
+  Timestamp,
+} from "firebase/firestore";
 import { fbStore } from "@/configs/firebase/firebase.config";
 import { fbNodes } from "@/configs/firebase/firebase.nodes";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -29,13 +47,37 @@ import {
 import {
   ROUTES,
   getAddExpenseRoute,
+  getAddSettlementRoute,
 } from "@/configs/navigation/navigation.constants";
 import { useAuthUser } from "@/modules/auth/store/auth.store";
 import { EXPENSE_CATEGORIES } from "@/modules/expenses/types/expenses.types";
 import { calculateGroupBalances } from "@/modules/balances/utils/balance.utils";
 import { getUserDebts } from "@/modules/balances/utils/balance.utils";
+import {
+  useAddGroupMember,
+  useRemoveGroupMember,
+  useDeleteGroup,
+  useArchiveGroup,
+  useUnarchiveGroup,
+} from "@/modules/groups/hooks/useGroupActions";
 import type { Group } from "@/modules/groups/types/groups.types";
 import type { Expense } from "@/modules/expenses/types/expenses.types";
+import { Loader2, Archive, Trash2, ArchiveRestore } from "lucide-react";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useListenSettlements } from "@/modules/settlements/hooks/useListenSettlements";
+import { useGroupSettlements } from "@/modules/settlements/store/settlements.store";
+import SettleUpDialog from "@/modules/settlements/components/settle-up-dialog";
+import SettlementList from "@/modules/settlements/components/settlement-list";
 
 export const GroupDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -45,6 +87,24 @@ export const GroupDetailPage = () => {
   const [group, setGroup] = useState<Group | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [addingMember, setAddingMember] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [settleDialogOpen, setSettleDialogOpen] = useState(false);
+
+  const { addMember } = useAddGroupMember();
+  const { removeMember } = useRemoveGroupMember();
+  const { deleteGroup } = useDeleteGroup();
+  const { archiveGroup } = useArchiveGroup();
+  const { unarchiveGroup } = useUnarchiveGroup();
+
+  // Listen to settlements
+  useListenSettlements(id);
+  const settlements = useGroupSettlements(id);
 
   // Listen to group details
   useEffect(() => {
@@ -60,23 +120,26 @@ export const GroupDetailPage = () => {
           description: data.description || undefined,
           imageUrl: data.imageUrl || undefined,
           currency: data.currency,
-          members: (data.members || []).map((m: { 
-            userId: string; 
-            name: string; 
-            email: string; 
-            photoURL?: string | null; 
-            role: string; 
-            joinedAt?: Timestamp | Date 
-          }) => ({
-            userId: m.userId,
-            name: m.name,
-            email: m.email,
-            photoURL: m.photoURL,
-            role: m.role,
-            joinedAt: m.joinedAt instanceof Date 
-              ? m.joinedAt 
-              : (m.joinedAt as Timestamp)?.toDate?.() || new Date(),
-          })),
+          members: (data.members || []).map(
+            (m: {
+              userId: string;
+              name: string;
+              email: string;
+              photoURL?: string | null;
+              role: string;
+              joinedAt?: Timestamp | Date;
+            }) => ({
+              userId: m.userId,
+              name: m.name,
+              email: m.email,
+              photoURL: m.photoURL,
+              role: m.role,
+              joinedAt:
+                m.joinedAt instanceof Date
+                  ? m.joinedAt
+                  : (m.joinedAt as Timestamp)?.toDate?.() || new Date(),
+            }),
+          ),
           createdBy: data.createdBy,
           createdAt: data.createdAt?.toDate?.() || new Date(),
           updatedAt: data.updatedAt?.toDate?.() || new Date(),
@@ -98,7 +161,7 @@ export const GroupDetailPage = () => {
     const expensesQuery = query(
       collection(fbStore, fbNodes.expenses),
       where("groupId", "==", id),
-      orderBy("date", "desc")
+      orderBy("date", "desc"),
     );
 
     const unsubscribe = onSnapshot(expensesQuery, (snapshot) => {
@@ -128,26 +191,93 @@ export const GroupDetailPage = () => {
     return () => unsubscribe();
   }, [id]);
 
-  // Calculate balances when group or expenses change
+  // Calculate balances when group, expenses, or settlements change
   const balances = useMemo(() => {
-    if (!group || expenses.length === 0) {
+    if (!group || (expenses.length === 0 && settlements.length === 0)) {
       return null;
     }
 
     return calculateGroupBalances(
       group.id,
       expenses,
+      settlements,
       group.members.map((m) => ({
         userId: m.userId,
         name: m.name,
         email: m.email,
         photoURL: m.photoURL || undefined,
-      }))
+      })),
     );
-  }, [group, expenses]);
+  }, [group, expenses, settlements]);
 
   const isAdmin =
     group?.members.find((m) => m.userId === authUser?.uid)?.role === "admin";
+
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !newMemberEmail.trim()) {
+      toast.error("Please enter an email");
+      return;
+    }
+
+    setAddingMember(true);
+    const result = await addMember(id, newMemberEmail.trim());
+    setAddingMember(false);
+
+    if (result.success) {
+      setAddMemberDialogOpen(false);
+      setNewMemberEmail("");
+    }
+  };
+
+  const handleRemoveMember = async (userId: string, memberName: string) => {
+    if (!id) return;
+
+    if (
+      confirm(`Are you sure you want to remove ${memberName} from this group?`)
+    ) {
+      await removeMember(id, userId, memberName);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!id || !group) return;
+
+    setActionLoading(true);
+    const result = await deleteGroup(id, group.name);
+    setActionLoading(false);
+
+    if (result.success) {
+      setDeleteConfirmOpen(false);
+      navigate(ROUTES.GROUPS);
+    }
+  };
+
+  const handleArchiveGroup = async () => {
+    if (!id || !group) return;
+
+    setActionLoading(true);
+    const result = await archiveGroup(id, group.name);
+    setActionLoading(false);
+
+    if (result.success) {
+      setArchiveConfirmOpen(false);
+      setSettingsDialogOpen(false);
+      navigate(ROUTES.GROUPS);
+    }
+  };
+
+  const handleUnarchiveGroup = async () => {
+    if (!id || !group) return;
+
+    setActionLoading(true);
+    const result = await unarchiveGroup(id, group.name);
+    setActionLoading(false);
+
+    if (result.success) {
+      setSettingsDialogOpen(false);
+    }
+  };
 
   const getCurrencySymbol = (currency: string) => {
     const symbols: Record<string, string> = {
@@ -201,13 +331,68 @@ export const GroupDetailPage = () => {
                   <Users className="h-3 w-3 mr-1" />
                   {group.members.length} members
                 </Badge>
+                {group.archived && (
+                  <Badge variant="destructive">
+                    <Archive className="h-3 w-3 mr-1" />
+                    Archived
+                  </Badge>
+                )}
               </div>
             </div>
             {isAdmin && (
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
+              <Dialog
+                open={settingsDialogOpen}
+                onOpenChange={setSettingsDialogOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Group Settings</DialogTitle>
+                    <DialogDescription>
+                      Manage settings for {group.name}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3 py-4">
+                    {group.archived ? (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={handleUnarchiveGroup}
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArchiveRestore className="mr-2 h-4 w-4" />
+                        )}
+                        Unarchive Group
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => setArchiveConfirmOpen(true)}
+                      >
+                        <Archive className="mr-2 h-4 w-4" />
+                        Archive Group
+                      </Button>
+                    )}
+                    <Button
+                      variant="destructive"
+                      className="w-full justify-start"
+                      onClick={() => setDeleteConfirmOpen(true)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Group
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </div>
@@ -224,7 +409,11 @@ export const GroupDetailPage = () => {
           <Plus className="h-4 w-4 mr-2" />
           Add Expense
         </Button>
-        <Button variant="outline" className="flex-1">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => setSettleDialogOpen(true)}
+        >
           <TrendingUp className="h-4 w-4 mr-2" />
           Settle Up
         </Button>
@@ -232,23 +421,27 @@ export const GroupDetailPage = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="expenses" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="expenses">
-            <Receipt className="h-4 w-4 mr-2" />
-            Expenses
+        <TabsList className="grid w-full grid-cols-4 h-auto!">
+          <TabsTrigger value="expenses" className="flex-col sm:flex-row gap-1 sm:gap-2">
+            <Receipt className="h-4 w-4" />
+            <span className="text-xs sm:text-sm">Expenses</span>
           </TabsTrigger>
-          <TabsTrigger value="balances">
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Balances
+          <TabsTrigger value="balances" className="flex-col sm:flex-row gap-1 sm:gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-xs sm:text-sm">Balances</span>
           </TabsTrigger>
-          <TabsTrigger value="members">
-            <Users className="h-4 w-4 mr-2" />
-            Members
+          <TabsTrigger value="settlements" className="flex-col sm:flex-row gap-1 sm:gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-xs sm:text-sm">Settlements</span>
+          </TabsTrigger>
+          <TabsTrigger value="members" className="flex-col sm:flex-row gap-1 sm:gap-2">
+            <Users className="h-4 w-4" />
+            <span className="text-xs sm:text-sm">Members</span>
           </TabsTrigger>
         </TabsList>
 
         {/* Expenses Tab */}
-        <TabsContent value="expenses" className="space-y-4">
+        <TabsContent value="expenses" className="space-y-4 h-auto">
           <Card>
             <CardContent className="pt-6">
               {expenses.length === 0 ? (
@@ -527,6 +720,33 @@ export const GroupDetailPage = () => {
           )}
         </TabsContent>
 
+        {/* Settlements Tab */}
+        <TabsContent value="settlements" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Settlement History</CardTitle>
+                  <CardDescription>
+                    Payments recorded between members
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(getAddSettlementRoute(group.id))}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Settlement
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <SettlementList settlements={settlements} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Members Tab */}
         <TabsContent value="members" className="space-y-4">
           <Card>
@@ -539,10 +759,55 @@ export const GroupDetailPage = () => {
                   </CardDescription>
                 </div>
                 {isAdmin && (
-                  <Button variant="outline" size="sm">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add Member
-                  </Button>
+                  <Dialog
+                    open={addMemberDialogOpen}
+                    onOpenChange={setAddMemberDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Add Member
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add Member to Group</DialogTitle>
+                        <DialogDescription>
+                          Enter the email address of the person you want to add
+                          to this group.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleAddMember} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="member-email">Email Address</Label>
+                          <Input
+                            id="member-email"
+                            type="email"
+                            placeholder="friend@example.com"
+                            value={newMemberEmail}
+                            onChange={(e) => setNewMemberEmail(e.target.value)}
+                            disabled={addingMember}
+                          />
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setAddMemberDialogOpen(false)}
+                            disabled={addingMember}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={addingMember}>
+                            {addingMember && (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            Add Member
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 )}
               </div>
             </CardHeader>
@@ -586,6 +851,9 @@ export const GroupDetailPage = () => {
                           variant="ghost"
                           size="sm"
                           className="text-destructive"
+                          onClick={() =>
+                            handleRemoveMember(member.userId, member.name)
+                          }
                         >
                           Remove
                         </Button>
@@ -598,6 +866,73 @@ export const GroupDetailPage = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete "{group.name}"? This
+              action cannot be undone. All expenses and data associated with
+              this group will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteGroup}
+              disabled={actionLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {actionLoading && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Delete Group
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Archive Confirmation Dialog */}
+      <AlertDialog
+        open={archiveConfirmOpen}
+        onOpenChange={setArchiveConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to archive "{group.name}"? Archived groups
+              won't appear in your main list but can be unarchived later from
+              settings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleArchiveGroup}
+              disabled={actionLoading}
+            >
+              {actionLoading && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Archive Group
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Settle Up Dialog */}
+      <SettleUpDialog
+        open={settleDialogOpen}
+        onOpenChange={setSettleDialogOpen}
+        group={group}
+      />
     </div>
   );
 };
